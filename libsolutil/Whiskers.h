@@ -93,6 +93,7 @@ private:
 	Whiskers& operator()(std::string _parameter, long long);
 	void checkParameterValid(std::string const& _parameter) const;
 	void checkParameterUnknown(std::string const& _parameter) const;
+	void checkTemplateContainsTags(std::string const& _parameter, std::vector<std::string> const& _tags);
 
 	static std::string replace(
 		std::string const& _template,

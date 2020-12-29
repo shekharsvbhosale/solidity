@@ -1227,9 +1227,17 @@ string ABIFunctions::abiDecodingFunctionCalldataArray(ArrayType const& _type)
 		"abi_decode_" +
 		_type.identifier();
 	return createFunction(functionName, [&]() {
-		string templ;
+		string result;
+		std::map<std::string, std::string> parameters{
+			{"revertStringPos", revertReasonIfDebug("ABI decoding: invalid calldata array stride")},
+			{"functionName", functionName},
+			{"readableTypeName", _type.toString(true)},
+			{"stride", toCompactHexWithPrefix(_type.calldataStride())},
+			{"revertStringPos", revertReasonIfDebug("ABI decoding: invalid calldata array stride")}
+		};
 		if (_type.isDynamicallySized())
-			templ = R"(
+		{
+			Whiskers w(R"(
 				// <readableTypeName>
 				function <functionName>(offset, end) -> arrayPos, length {
 					if iszero(slt(add(offset, 0x1f), end)) { <revertStringOffset> }
@@ -1238,26 +1246,29 @@ string ABIFunctions::abiDecodingFunctionCalldataArray(ArrayType const& _type)
 					arrayPos := add(offset, 0x20)
 					if gt(add(arrayPos, mul(length, <stride>)), end) { <revertStringPos> }
 				}
-			)";
+			)");
+			for (auto& parameter: parameters)
+				w(parameter.first, parameter.second);
+			w("revertStringOffset", revertReasonIfDebug("ABI decoding: invalid calldata array offset"));
+			w("revertStringLength", revertReasonIfDebug("ABI decoding: invalid calldata array length"));
+			result = w.render();
+		}
 		else
-			templ = R"(
+		{
+			Whiskers w(R"(
 				// <readableTypeName>
 				function <functionName>(offset, end) -> arrayPos {
 					arrayPos := offset
 					if gt(add(arrayPos, mul(<length>, <stride>)), end) { <revertStringPos> }
 				}
-			)";
-		Whiskers w{templ};
-		// TODO add test
-		w("revertStringOffset", revertReasonIfDebug("ABI decoding: invalid calldata array offset"));
-		w("revertStringLength", revertReasonIfDebug("ABI decoding: invalid calldata array length"));
-		w("revertStringPos", revertReasonIfDebug("ABI decoding: invalid calldata array stride"));
-		w("functionName", functionName);
-		w("readableTypeName", _type.toString(true));
-		w("stride", toCompactHexWithPrefix(_type.calldataStride()));
-		if (!_type.isDynamicallySized())
+			)");
+			for (auto& parameter: parameters)
+				w(parameter.first, parameter.second);
 			w("length", toCompactHexWithPrefix(_type.length()));
-		return w.render();
+			result = w.render();
+		}
+		// TODO add test
+		return result;
 	});
 }
 
